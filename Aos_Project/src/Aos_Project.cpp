@@ -69,7 +69,7 @@ template <typename T, size_t N>
 T* end (T(&arr)[N]) {
 	return &arr[N];
 }
-string nodes[] = {"192.168.0.1","192.168.0.2","192.168.0.3","192.168.0.4","192.168.0.5"};
+string nodes[] = {"192.168.1.14","192.168.1.15"};
 //vector<string> nodeList(begin(nodes),end(nodes));
 
 LamportClock lclock;
@@ -164,10 +164,10 @@ void* accept_connection(void *threadarg) {
 		exit(0);
 	}
 	buf[numbytes] = '\0';
-	cout<<"numbytes" << numbytes <<endl;
 	cout<<"server received " << buf <<endl; // value of clock at senders side
 	pthread_mutex_lock(&clock_mutex);
 	lclock.tick(atoi(buf));
+	cout<<"clock is now " << lclock.getClockValue() <<endl;
 	pthread_mutex_unlock(&clock_mutex);
 	close(new_fd);
 	pthread_exit(NULL);
@@ -212,6 +212,7 @@ void* send_master(void *threadarg) {
 		// check later and see if we can read value without doing a mutex check
 		pthread_mutex_lock(&clock_mutex);
 			if(lclock.getClockValue() == currentAction.clockVal) {
+				cout<<"time before tick " << lclock.getClockValue() <<endl;
 				// time to do something
 				lclock.tick();
 				if(currentAction.type == "TICK") {
@@ -225,7 +226,7 @@ void* send_master(void *threadarg) {
 					msg.payLoad = lclock.getClockValue();
 					pthread_create(&send_thread,NULL,send_message,(void *)&msg); // async thread call for sending message
 				}
-
+				cout<<"clock value now " << lclock.getClockValue() <<endl;
 			}
 		pthread_mutex_unlock(&clock_mutex);
 	}
