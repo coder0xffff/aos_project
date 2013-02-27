@@ -36,6 +36,7 @@ using namespace std;
 #define MAXDATASIZE 100 // max number of bytes we can get at once
 #define PORT "3490"
 #define BACKLOG 10
+
 void* accept_connection(void *threadarg);
 void sigchld_handler(int s) {
 	while(waitpid(-1, NULL, WNOHANG) > 0);
@@ -75,7 +76,8 @@ string nodes[] = {"192.168.1.14","192.168.1.15"};
 LamportClock lclock;
 pthread_mutex_t clock_mutex;
 void* send_message(void *threadarg);
-int main() {
+char *currentNode;
+int main(int argc, char **argv) {
 	cout << "!!!Hello World!!!" << endl; // prints !!!Hello World!!!
 	int sockfd;
 	intptr_t new_fd;
@@ -91,7 +93,7 @@ int main() {
 	hints.ai_family = AF_UNSPEC;
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_flags = AI_PASSIVE;
-
+	currentNode = argv[1];
 	pthread_mutex_init(&clock_mutex,NULL);
 
 	if((rv = getaddrinfo(NULL, PORT, &hints, &servinfo)) != 0) {
@@ -196,7 +198,7 @@ void* send_master(void *threadarg) {
 		getline(iFile,line);
 		split(line,' ',paramData);
 		//cout<<" line no " << ++lineNo <<endl;
-		if(paramData[0] == "2") {
+		if(paramData[0] == currentNode) {
 			temp.nodeid = atoi(paramData[0].c_str());
 			temp.clockVal = atoi(paramData[1].c_str());
 			temp.type = paramData[2];
@@ -220,6 +222,9 @@ void* send_master(void *threadarg) {
 				}
 				else if(currentAction.type == "IDLE") {
 					// do some idle action
+				}
+				else if(currentAction.type == "INIT") {
+					// do nothing
 				}
 				else if(currentAction.type == "SEND") {
 					msg.nodeid = nodes[currentAction.param].c_str(); // check if this works without c_str
@@ -272,7 +277,7 @@ void* send_message(void *threadarg) {
 				s, sizeof s);
 		printf("client: connecting to %s\n", s);
 		freeaddrinfo(servinfo); // all done with this structure
-		if(send(sockfd,"hi ravi",7,0) == -1) {
+		if(send(sockfd,(msg->payLoad).c_str(),sizeof((msg->payLoad).c_str()),0) == -1) {
 			perror("send failed");
 			exit(1);
 		}
