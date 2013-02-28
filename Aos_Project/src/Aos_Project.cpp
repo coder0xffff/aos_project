@@ -9,8 +9,6 @@
 #include <iostream>
 #include "LamportClock.h"
 #include "Cornet.h"
-using namespace std;
-#include <iostream>
 #include <cstdlib>
 #include <cerrno>
 #include <sys/types.h>
@@ -36,7 +34,7 @@ using namespace std;
 #define MAXDATASIZE 100 // max number of bytes we can get at once
 #define PORT "3490"
 #define BACKLOG 10
-
+#define BUFMAX "50"
 void* accept_connection(void *threadarg);
 void sigchld_handler(int s) {
 	while(waitpid(-1, NULL, WNOHANG) > 0);
@@ -58,7 +56,7 @@ struct fileInput {
 
 struct messagePayload {
 	const char  *nodeid;
-	string payLoad;
+	char payLoad[50];
 	int thread_id;
 };
 template <typename T, size_t N>
@@ -76,11 +74,13 @@ string nodes[] = {"192.168.1.14","192.168.1.15"};
 LamportClock lclock;
 pthread_mutex_t clock_mutex;
 void* send_message(void *threadarg);
+void* send_master(void *threadarg);
 char *currentNode;
 int main(int argc, char **argv) {
 	cout << "!!!Hello World!!!" << endl; // prints !!!Hello World!!!
 	int sockfd;
 	intptr_t new_fd;
+	long t;
 	struct addrinfo hints, *servinfo, *p;
 	struct sockaddr_storage their_addr;
 	socklen_t sin_size;
@@ -95,7 +95,8 @@ int main(int argc, char **argv) {
 	hints.ai_flags = AI_PASSIVE;
 	currentNode = argv[1];
 	pthread_mutex_init(&clock_mutex,NULL);
-
+	pthread_t send_master_thread;
+	pthread_create(&send_master_thread,NULL,send_master,(void*)t);
 	if((rv = getaddrinfo(NULL, PORT, &hints, &servinfo)) != 0) {
 		cerr<< "getaddrinfo " << gai_strerror(rv) <<endl;
 		return 1;
@@ -190,7 +191,7 @@ void* send_master(void *threadarg) {
 	vector<string> paramData;
 	list<fileInput>fileInputList;
 	fileInput temp;
-	struct messagePayload msg;
+	struct messagePayload *msg = new struct messagePayload;
 	pthread_t send_thread;
 
 	iFile.open("data");
@@ -215,8 +216,8 @@ void* send_master(void *threadarg) {
 		pthread_mutex_lock(&clock_mutex);
 			if(lclock.getClockValue() == currentAction.clockVal) {
 				cout<<"time before tick " << lclock.getClockValue() <<endl;
-				// time to do something
-				lclock.tick();
+				cout<<"executing :" << currentAction.type << endl;
+
 				if(currentAction.type == "TICK") {
 					usleep(currentAction.param * 1000);
 				}
@@ -227,12 +228,17 @@ void* send_master(void *threadarg) {
 					// do nothing
 				}
 				else if(currentAction.type == "SEND") {
-					msg.nodeid = nodes[currentAction.param].c_str(); // check if this works without c_str
-					msg.payLoad = lclock.getClockValue();
-					pthread_create(&send_thread,NULL,send_message,(void *)&msg); // async thread call for sending message
+					msg->nodeid = nodes[currentAction.param].c_str(); // check if this works without c_str
+					cout<<"send to " << nodes[currentAction.param].c_str()<<endl;
+	//				msg->nodeid = "192.168.1.15";
+					sprintf(msg->payLoad, "%d",lclock.getClockValue());
+					pthread_create(&send_thread,NULL,send_message,(void *)msg); // async thread call for sending message
 				}
+				lclock.tick();
 				cout<<"clock value now " << lclock.getClockValue() <<endl;
+				fileInputList.pop_front();
 			}
+
 		pthread_mutex_unlock(&clock_mutex);
 	}
 
@@ -251,6 +257,8 @@ void* send_message(void *threadarg) {
 		hints.ai_family = AF_UNSPEC;
 		hints.ai_socktype = SOCK_STREAM;
 		msg = ( struct messagePayload*) threadarg;
+		cout<<"msg->nodeid :" << msg->nodeid <<endl;
+		cout<<"msg->payLoad :" << msg->payLoad <<endl;
 		if ((rv = getaddrinfo(msg->nodeid, PORT, &hints, &servinfo)) != 0) {
 			fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
 		//	return 1;
@@ -277,7 +285,8 @@ void* send_message(void *threadarg) {
 				s, sizeof s);
 		printf("client: connecting to %s\n", s);
 		freeaddrinfo(servinfo); // all done with this structure
-		if(send(sockfd,(msg->payLoad).c_str(),sizeof((msg->payLoad).c_str()),0) == -1) {
+		cout<< "sending" << msg->payLoad << endl;
+		if(send(sockfd,msg->payLoad,sizeof(msg->payLoad),0) == -1) {
 			perror("send failed");
 			exit(1);
 		}
