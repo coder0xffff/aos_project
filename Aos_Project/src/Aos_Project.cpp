@@ -77,7 +77,6 @@ void* send_message(void *threadarg);
 void* send_master(void *threadarg);
 char *currentNode;
 int main(int argc, char **argv) {
-	cout << "!!!Hello World!!!" << endl; // prints !!!Hello World!!!
 	int sockfd;
 	intptr_t new_fd;
 	long t;
@@ -167,10 +166,11 @@ void* accept_connection(void *threadarg) {
 		exit(0);
 	}
 	buf[numbytes] = '\0';
-	cout<<"server received " << buf <<endl; // value of clock at senders side
+	//cout<<"server received " << buf <<endl; // value of clock at senders side
 	pthread_mutex_lock(&clock_mutex);
 	lclock.tick(atoi(buf));
-	cout<<"clock is now " << lclock.getClockValue() <<endl;
+	cout << lclock.getClockValue() << "RECV"  <<endl;
+	lclock.tick();
 	pthread_mutex_unlock(&clock_mutex);
 	close(new_fd);
 	pthread_exit(NULL);
@@ -215,9 +215,7 @@ void* send_master(void *threadarg) {
 		// check later and see if we can read value without doing a mutex check
 		pthread_mutex_lock(&clock_mutex);
 			if(lclock.getClockValue() == currentAction.clockVal) {
-				cout<<"time before tick " << lclock.getClockValue() <<endl;
-				cout<<"executing :" << currentAction.type << endl;
-
+				cout<< lclock.getClockValue() << currentAction.type << currentAction.param <<endl;
 				if(currentAction.type == "TICK") {
 					usleep(currentAction.param * 1000);
 				}
@@ -229,13 +227,11 @@ void* send_master(void *threadarg) {
 				}
 				else if(currentAction.type == "SEND") {
 					msg->nodeid = nodes[currentAction.param].c_str(); // check if this works without c_str
-					cout<<"send to " << nodes[currentAction.param].c_str()<<endl;
 	//				msg->nodeid = "192.168.1.15";
 					sprintf(msg->payLoad, "%d",lclock.getClockValue());
 					pthread_create(&send_thread,NULL,send_message,(void *)msg); // async thread call for sending message
 				}
 				lclock.tick();
-				cout<<"clock value now " << lclock.getClockValue() <<endl;
 				fileInputList.pop_front();
 			}
 
@@ -257,8 +253,6 @@ void* send_message(void *threadarg) {
 		hints.ai_family = AF_UNSPEC;
 		hints.ai_socktype = SOCK_STREAM;
 		msg = ( struct messagePayload*) threadarg;
-		cout<<"msg->nodeid :" << msg->nodeid <<endl;
-		cout<<"msg->payLoad :" << msg->payLoad <<endl;
 		if ((rv = getaddrinfo(msg->nodeid, PORT, &hints, &servinfo)) != 0) {
 			fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
 		//	return 1;
@@ -283,9 +277,7 @@ void* send_message(void *threadarg) {
 		}
 		inet_ntop(p->ai_family, get_in_addr((struct sockaddr *)p->ai_addr),
 				s, sizeof s);
-		printf("client: connecting to %s\n", s);
 		freeaddrinfo(servinfo); // all done with this structure
-		cout<< "sending" << msg->payLoad << endl;
 		if(send(sockfd,msg->payLoad,sizeof(msg->payLoad),0) == -1) {
 			perror("send failed");
 			exit(1);
