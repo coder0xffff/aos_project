@@ -68,7 +68,7 @@ template <typename T, size_t N>
 T* end (T(&arr)[N]) {
 	return &arr[N];
 }
-string nodes[] = {"192.168.1.14","192.168.1.15"};
+string nodes[] = {"192.168.1.8","192.168.1.9","192.168.1.10","192.168.1.12","192.168.1.13"};
 //vector<string> nodeList(begin(nodes),end(nodes));
 
 LamportClock lclock;
