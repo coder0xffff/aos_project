@@ -259,7 +259,7 @@ void* send_master(void *threadarg) {
 			currentAction = fileInputList.front();
 			// check later and see if we can read value without doing a mutex check
 			pthread_mutex_lock(&clock_mutex);
-			if(lclock.getClockValue() == currentAction.clockVal) {
+			while(lclock.getClockValue() == currentAction.clockVal) {
 				if(currentAction.type == "TICK") {
 					cout<< lclock.getClockValue() << currentAction.type << currentAction.param <<endl;
 					usleep(currentAction.param * 1000);
@@ -351,14 +351,14 @@ void* send_message(void *threadarg) {
 		exit(1);
 	}
 	vector<string> splitPayload;
-	split(msg->payLoad,' ',splitPayload);
-	if(splitPayload.size() == 1) {
-		// sent a message
-		pthread_mutex_lock(&D_mutex);
-		D++;
-		pthread_mutex_unlock(&D_mutex);
+		split(msg->payLoad,' ',splitPayload);
+		if(splitPayload.size() == 1) {
+			// sent a message
+			pthread_mutex_lock(&D_mutex);
+			D++;
+			pthread_mutex_unlock(&D_mutex);
 
-	}
+		}
 	cout<<"after sending message << " "D: " << D << " " << "C: " << cornet.size() <<endl;
 	close(sockfd);
 	pthread_exit(NULL);
