@@ -279,6 +279,10 @@ void* send_master(void *threadarg) {
 					msg->nodeid = nodes[currentAction.param].c_str(); // check if this works without c_str
 					//				msg->nodeid = "192.168.1.15";
 					sprintf(msg->payLoad, "%d",lclock.getClockValue());
+					pthread_mutex_lock(&D_mutex);
+						D++;
+					pthread_mutex_unlock(&D_mutex);
+					cout<<"after sending message << " "D: " << D << " " << "C: " << cornet.size() <<endl;
 					pthread_create(&send_thread,NULL,send_message,(void *)msg); // async thread call for sending message
 				}
 				lclock.tick();
@@ -350,6 +354,7 @@ void* send_message(void *threadarg) {
 		perror("send failed");
 		exit(1);
 	}
+	/*
 	vector<string> splitPayload;
 		split(msg->payLoad,' ',splitPayload);
 		if(splitPayload.size() == 1) {
@@ -359,7 +364,8 @@ void* send_message(void *threadarg) {
 			pthread_mutex_unlock(&D_mutex);
 
 		}
-	cout<<"after sending message << " "D: " << D << " " << "C: " << cornet.size() <<endl;
+		*/
+
 	close(sockfd);
 	pthread_exit(NULL);
 }
