@@ -284,13 +284,14 @@ void* send_master(void *threadarg) {
 			pthread_mutex_lock(&cornet_mutex);
 			if(!cornet.isEmpty()) {
 				pthread_mutex_lock(&D_mutex);
-				if((receivedIDLE &&  D == 0 && cornet.size() == 1) || cornet.size() > 1) {
+				if( (receivedIDLE &&  D == 0 && cornet.size() == 1) || (cornet.size() > 1) ) {
 					//send signal
 					msg = new struct messagePayload;
 					msg->nodeid = cornet.getElement().c_str();
 					pthread_mutex_lock(&clock_mutex);
 					sprintf(msg->payLoad, "%d SIGNAL",lclock.getClockValue());
 					cout<< lclock.getClockValue() <<"SIGNAL SEND: " << ip2node[msg->nodeid] <<endl;
+					cout<< "D: " << D << " " << "C: " << cornet.size() <<endl;
 					pthread_create(&send_thread,NULL,send_message,(void *)msg);
 					lclock.tick();
 					pthread_mutex_unlock(&clock_mutex);
@@ -349,7 +350,9 @@ void* send_message(void *threadarg) {
 			pthread_mutex_lock(&D_mutex);
 			D++;
 			pthread_mutex_unlock(&D_mutex);
+
 		}
+		cout<< "D: " << D << " " << "C: " << cornet.size() <<endl;
 		close(sockfd);
 		pthread_exit(NULL);
 }
