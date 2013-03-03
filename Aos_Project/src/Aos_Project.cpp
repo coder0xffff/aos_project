@@ -88,6 +88,7 @@ vector<string> nodes;
 //vector<string> nodeList(begin(nodes),end(nodes));
 map<string,int> ip2node;
 bool receivedIDLE = false;
+bool initNode = false;
 LamportClock lclock;
 Cornet cornet;  // record which parents have sent a message
 int D = 0;     // sum of deficits of outgoing edges
@@ -284,6 +285,7 @@ void* send_master(void *threadarg) {
 				}
 				else if(currentAction.type == "INIT") {
 					cout<< lclock.getClockValue() << " "<< currentAction.type <<endl;
+					initNode = true;
 					// do nothing
 				}
 				else if(currentAction.type == "SEND") {
@@ -320,6 +322,13 @@ void* send_master(void *threadarg) {
 				pthread_mutex_unlock(&clock_mutex);
 			}
 			pthread_mutex_unlock(&D_mutex);
+		}
+		else {
+			//cornet is empty
+
+			if(initNode) {
+				cout << "terminated: " << lclock.getClockValue() << endl;
+			}
 		}
 		pthread_mutex_unlock(&cornet_mutex);
 	}
