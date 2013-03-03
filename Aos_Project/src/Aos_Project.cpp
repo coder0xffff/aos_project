@@ -50,11 +50,11 @@ void* get_in_addr(struct sockaddr *sa) {
 
 std::vector<std::string> &split(const std::string &s, char delim, std::vector<std::string> &elems) {
 	std::stringstream ss(s);
-    std::string item;
-    while(std::getline(ss, item, delim)) {
-        elems.push_back(item);
-    }
-    return elems;
+	std::string item;
+	while(std::getline(ss, item, delim)) {
+		elems.push_back(item);
+	}
+	return elems;
 }
 
 struct fileInput {
@@ -201,16 +201,19 @@ void* accept_connection(void *threadarg) {
 	split(buf,' ',msgPayloadList);
 
 	if(msgPayloadList.size() == 1) {
-	lclock.tick(atoi(msgPayloadList[0].c_str()));
-	cout << lclock.getClockValue() << "RECV "  << ip2node[acceptData->sender] <<endl;
-	lclock.tick();
-	pthread_mutex_unlock(&clock_mutex);
-	pthread_mutex_lock(&cornet_mutex);
-	cornet.addElement(acceptData->sender);
-	cout<<"add cornet: " << acceptData->sender << endl;
-	pthread_mutex_unlock(&cornet_mutex);
+		// incoming is a message
+		lclock.tick(atoi(msgPayloadList[0].c_str()));
+		cout << lclock.getClockValue() << "RECV "  << ip2node[acceptData->sender] <<endl;
+		lclock.tick();
+		pthread_mutex_unlock(&clock_mutex);
+		pthread_mutex_lock(&cornet_mutex);
+		cout<<"add cornet: " << acceptData->sender << endl;
+		cornet.addElement(acceptData->sender);
+		cout<< "After add cornet: "<< "D: " << D << " " << "C: " << cornet.size() <<endl;
+		pthread_mutex_unlock(&cornet_mutex);
 	}
 	else {
+		// incoming is a signal
 		lclock.tick(atoi(msgPayloadList[0].c_str()));
 		cout << lclock.getClockValue() << " SIGNAL RECV: "  << ip2node[acceptData->sender] <<endl;
 		lclock.tick();
@@ -218,6 +221,7 @@ void* accept_connection(void *threadarg) {
 		pthread_mutex_lock(&D_mutex);
 		D--;
 		pthread_mutex_unlock(&D_mutex);
+		cout<< "After recv signal: "<< "D: " << D << " " << "C: " << cornet.size() <<endl;
 	}
 	close(acceptData->new_fd);
 	pthread_exit(NULL);
@@ -254,51 +258,51 @@ void* send_master(void *threadarg) {
 		currentAction = fileInputList.front();
 		// check later and see if we can read value without doing a mutex check
 		pthread_mutex_lock(&clock_mutex);
-			if(lclock.getClockValue() == currentAction.clockVal) {
-				if(currentAction.type == "TICK") {
-					cout<< lclock.getClockValue() << currentAction.type << currentAction.param <<endl;
-					usleep(currentAction.param * 1000);
-				}
-				else if(currentAction.type == "IDLE") {
-					cout<< lclock.getClockValue() << " " << currentAction.type <<endl;
-					receivedIDLE = true;
-					// do some idle action
-				}
-				else if(currentAction.type == "INIT") {
-					cout<< lclock.getClockValue() << " "<< currentAction.type <<endl;
-					// do nothing
-				}
-				else if(currentAction.type == "SEND") {
-					cout<< lclock.getClockValue() << " " << currentAction.type <<" "<< currentAction.param <<endl;
-					msg = new struct messagePayload;
-					msg->nodeid = nodes[currentAction.param].c_str(); // check if this works without c_str
-	//				msg->nodeid = "192.168.1.15";
-					sprintf(msg->payLoad, "%d",lclock.getClockValue());
-					pthread_create(&send_thread,NULL,send_message,(void *)msg); // async thread call for sending message
-				}
-				lclock.tick();
-				fileInputList.pop_front();
+		if(lclock.getClockValue() == currentAction.clockVal) {
+			if(currentAction.type == "TICK") {
+				cout<< lclock.getClockValue() << currentAction.type << currentAction.param <<endl;
+				usleep(currentAction.param * 1000);
 			}
+			else if(currentAction.type == "IDLE") {
+				cout<< lclock.getClockValue() << " " << currentAction.type <<endl;
+				receivedIDLE = true;
+				// do some idle action
+			}
+			else if(currentAction.type == "INIT") {
+				cout<< lclock.getClockValue() << " "<< currentAction.type <<endl;
+				// do nothing
+			}
+			else if(currentAction.type == "SEND") {
+				cout<< lclock.getClockValue() << " " << currentAction.type <<" "<< currentAction.param <<endl;
+				msg = new struct messagePayload;
+				msg->nodeid = nodes[currentAction.param].c_str(); // check if this works without c_str
+				//				msg->nodeid = "192.168.1.15";
+				sprintf(msg->payLoad, "%d",lclock.getClockValue());
+				pthread_create(&send_thread,NULL,send_message,(void *)msg); // async thread call for sending message
+			}
+			lclock.tick();
+			fileInputList.pop_front();
+		}
 
-			pthread_mutex_unlock(&clock_mutex);
-			pthread_mutex_lock(&cornet_mutex);
-			if(!cornet.isEmpty()) {
-				pthread_mutex_lock(&D_mutex);
-				if( (receivedIDLE &&  D == 0 && cornet.size() == 1) || (cornet.size() > 1) ) {
-					//send signal
-					msg = new struct messagePayload;
-					msg->nodeid = cornet.getElement().c_str();
-					pthread_mutex_lock(&clock_mutex);
-					sprintf(msg->payLoad, "%d SIGNAL",lclock.getClockValue());
-					cout<< lclock.getClockValue() <<"SIGNAL SEND: " << ip2node[msg->nodeid] <<endl;
-					cout<< "D: " << D << " " << "C: " << cornet.size() <<endl;
-					pthread_create(&send_thread,NULL,send_message,(void *)msg);
-					lclock.tick();
-					pthread_mutex_unlock(&clock_mutex);
-				}
-				pthread_mutex_unlock(&D_mutex);
+		pthread_mutex_unlock(&clock_mutex);
+		pthread_mutex_lock(&cornet_mutex);
+		if(!cornet.isEmpty()) {
+			pthread_mutex_lock(&D_mutex);
+			if( (receivedIDLE &&  D == 0 && cornet.size() == 1) || (cornet.size() > 1) ) {
+				//send signal
+				msg = new struct messagePayload;
+				msg->nodeid = cornet.getElement().c_str();
+				pthread_mutex_lock(&clock_mutex);
+				sprintf(msg->payLoad, "%d SIGNAL",lclock.getClockValue());
+				cout<< lclock.getClockValue() <<"SIGNAL SEND: " << ip2node[msg->nodeid] <<endl;
+				cout<<"at removing node "<< "D: " << D << " " << "C: " << cornet.size() <<endl;
+				pthread_create(&send_thread,NULL,send_message,(void *)msg);
+				lclock.tick();
+				pthread_mutex_unlock(&clock_mutex);
 			}
-			pthread_mutex_unlock(&cornet_mutex);
+			pthread_mutex_unlock(&D_mutex);
+		}
+		pthread_mutex_unlock(&cornet_mutex);
 	}
 
 	pthread_exit(NULL);
@@ -306,53 +310,54 @@ void* send_master(void *threadarg) {
 }
 
 void* send_message(void *threadarg) {
-		int sockfd;
-		struct addrinfo hints, *servinfo, *p;
-		struct messagePayload *msg;
-		int rv;
-		char s[INET6_ADDRSTRLEN];
-		memset(&hints, 0, sizeof hints);
-		hints.ai_family = AF_UNSPEC;
-		hints.ai_socktype = SOCK_STREAM;
-		msg = ( struct messagePayload*) threadarg;
-		if ((rv = getaddrinfo(msg->nodeid, PORT, &hints, &servinfo)) != 0) {
-			fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
+	int sockfd;
+	struct addrinfo hints, *servinfo, *p;
+	struct messagePayload *msg;
+	int rv;
+	char s[INET6_ADDRSTRLEN];
+	memset(&hints, 0, sizeof hints);
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_STREAM;
+	msg = ( struct messagePayload*) threadarg;
+	if ((rv = getaddrinfo(msg->nodeid, PORT, &hints, &servinfo)) != 0) {
+		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
 		//	return 1;
+	}
+	// loop through all the results and connect to the first we can
+	for(p = servinfo; p != NULL; p = p->ai_next) {
+		if ((sockfd = socket(p->ai_family, p->ai_socktype,
+				p->ai_protocol)) == -1) {
+			perror("client: socket");
+			continue;
 		}
-		// loop through all the results and connect to the first we can
-		for(p = servinfo; p != NULL; p = p->ai_next) {
-			if ((sockfd = socket(p->ai_family, p->ai_socktype,
-					p->ai_protocol)) == -1) {
-				perror("client: socket");
-				continue;
-			}
-			if (connect(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
-				close(sockfd);
-				perror("client: connect");
-				continue;
-			}
-			break;
+		if (connect(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
+			close(sockfd);
+			perror("client: connect");
+			continue;
 		}
-		if (p == NULL) {
-			fprintf(stderr, "client: failed to connect\n");
-			//return 2;
-		}
-		inet_ntop(p->ai_family, get_in_addr((struct sockaddr *)p->ai_addr),
-				s, sizeof s);
-		freeaddrinfo(servinfo); // all done with this structure
-		if(send(sockfd,msg->payLoad,sizeof(msg->payLoad),0) == -1) {
-			perror("send failed");
-			exit(1);
-		}
-		vector<string> splitPayload;
-		split(msg->payLoad,' ',splitPayload);
-		if(splitPayload.size() == 1) {
-			pthread_mutex_lock(&D_mutex);
-			D++;
-			pthread_mutex_unlock(&D_mutex);
+		break;
+	}
+	if (p == NULL) {
+		fprintf(stderr, "client: failed to connect\n");
+		//return 2;
+	}
+	inet_ntop(p->ai_family, get_in_addr((struct sockaddr *)p->ai_addr),
+			s, sizeof s);
+	freeaddrinfo(servinfo); // all done with this structure
+	if(send(sockfd,msg->payLoad,sizeof(msg->payLoad),0) == -1) {
+		perror("send failed");
+		exit(1);
+	}
+	vector<string> splitPayload;
+	split(msg->payLoad,' ',splitPayload);
+	if(splitPayload.size() == 1) {
+		// sent a message
+		pthread_mutex_lock(&D_mutex);
+		D++;
+		pthread_mutex_unlock(&D_mutex);
 
-		}
-		cout<< "D: " << D << " " << "C: " << cornet.size() <<endl;
-		close(sockfd);
-		pthread_exit(NULL);
+	}
+	cout<<"after sending message << " "D: " << D << " " << "C: " << cornet.size() <<endl;
+	close(sockfd);
+	pthread_exit(NULL);
 }
