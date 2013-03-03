@@ -253,35 +253,37 @@ void* send_master(void *threadarg) {
 		}
 		paramData.clear();
 	} // reading of input to do list finished at this point
-	while(!fileInputList.empty()) {
-		struct fileInput currentAction;
-		currentAction = fileInputList.front();
-		// check later and see if we can read value without doing a mutex check
-		pthread_mutex_lock(&clock_mutex);
-		if(lclock.getClockValue() == currentAction.clockVal) {
-			if(currentAction.type == "TICK") {
-				cout<< lclock.getClockValue() << currentAction.type << currentAction.param <<endl;
-				usleep(currentAction.param * 1000);
+	while(1) {
+		if(!fileInputList.empty()) {
+			struct fileInput currentAction;
+			currentAction = fileInputList.front();
+			// check later and see if we can read value without doing a mutex check
+			pthread_mutex_lock(&clock_mutex);
+			if(lclock.getClockValue() == currentAction.clockVal) {
+				if(currentAction.type == "TICK") {
+					cout<< lclock.getClockValue() << currentAction.type << currentAction.param <<endl;
+					usleep(currentAction.param * 1000);
+				}
+				else if(currentAction.type == "IDLE") {
+					cout<< lclock.getClockValue() << " " << currentAction.type <<endl;
+					receivedIDLE = true;
+					// do some idle action
+				}
+				else if(currentAction.type == "INIT") {
+					cout<< lclock.getClockValue() << " "<< currentAction.type <<endl;
+					// do nothing
+				}
+				else if(currentAction.type == "SEND") {
+					cout<< lclock.getClockValue() << " " << currentAction.type <<" "<< currentAction.param <<endl;
+					msg = new struct messagePayload;
+					msg->nodeid = nodes[currentAction.param].c_str(); // check if this works without c_str
+					//				msg->nodeid = "192.168.1.15";
+					sprintf(msg->payLoad, "%d",lclock.getClockValue());
+					pthread_create(&send_thread,NULL,send_message,(void *)msg); // async thread call for sending message
+				}
+				lclock.tick();
+				fileInputList.pop_front();
 			}
-			else if(currentAction.type == "IDLE") {
-				cout<< lclock.getClockValue() << " " << currentAction.type <<endl;
-				receivedIDLE = true;
-				// do some idle action
-			}
-			else if(currentAction.type == "INIT") {
-				cout<< lclock.getClockValue() << " "<< currentAction.type <<endl;
-				// do nothing
-			}
-			else if(currentAction.type == "SEND") {
-				cout<< lclock.getClockValue() << " " << currentAction.type <<" "<< currentAction.param <<endl;
-				msg = new struct messagePayload;
-				msg->nodeid = nodes[currentAction.param].c_str(); // check if this works without c_str
-				//				msg->nodeid = "192.168.1.15";
-				sprintf(msg->payLoad, "%d",lclock.getClockValue());
-				pthread_create(&send_thread,NULL,send_message,(void *)msg); // async thread call for sending message
-			}
-			lclock.tick();
-			fileInputList.pop_front();
 		}
 
 		pthread_mutex_unlock(&clock_mutex);
