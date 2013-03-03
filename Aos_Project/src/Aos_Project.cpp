@@ -29,6 +29,7 @@
 #include <string>
 #include <fstream>
 #include <sstream>
+#include <map>
 using namespace std;
 
 #define MAXDATASIZE 100 // max number of bytes we can get at once
@@ -47,6 +48,15 @@ void* get_in_addr(struct sockaddr *sa) {
 	return &(((sockaddr_in*)sa)->sin_addr);
 }
 
+std::vector<std::string> &split(const std::string &s, char delim, std::vector<std::string> &elems) {
+	std::stringstream ss(s);
+    std::string item;
+    while(std::getline(ss, item, delim)) {
+        elems.push_back(item);
+    }
+    return elems;
+}
+
 struct fileInput {
 	unsigned int nodeid;
 	unsigned int clockVal;
@@ -59,6 +69,11 @@ struct messagePayload {
 	char payLoad[50];
 	int thread_id;
 };
+
+struct acceptConnectionData {
+	string sender;
+	intptr_t new_fd;
+};
 template <typename T, size_t N>
 T* begin(T(&arr)[N]) {
 	return &arr[0];
@@ -70,9 +85,14 @@ T* end (T(&arr)[N]) {
 }
 string nodes[] = {"192.168.1.8","192.168.1.9","192.168.1.10","192.168.1.12","192.168.1.13"};
 //vector<string> nodeList(begin(nodes),end(nodes));
-
+map<string,int> ip2node;
+bool receivedIDLE = false;
 LamportClock lclock;
+Cornet cornet;  // record which parents have sent a message
+int D = 0;     // sum of deficits of outgoing edges
 pthread_mutex_t clock_mutex;
+pthread_mutex_t D_mutex;
+pthread_mutex_t cornet_mutex;
 void* send_message(void *threadarg);
 void* send_master(void *threadarg);
 char *currentNode;
@@ -92,8 +112,16 @@ int main(int argc, char **argv) {
 	hints.ai_family = AF_UNSPEC;
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_flags = AI_PASSIVE;
+
+	ip2node["192.168.1.8"] = 0;
+	ip2node["192.168.1.9"] = 1;
+	ip2node["192.168.1.10"] = 2;
+	ip2node["192.168.1.12"] = 3;
+	ip2node["192.168.1.13"] = 4;
 	currentNode = argv[1];
 	pthread_mutex_init(&clock_mutex,NULL);
+	pthread_mutex_init(&D_mutex,NULL);
+	pthread_mutex_init(&cornet_mutex,NULL);
 	pthread_t send_master_thread;
 	pthread_create(&send_master_thread,NULL,send_master,(void*)t);
 	if((rv = getaddrinfo(NULL, PORT, &hints, &servinfo)) != 0) {
@@ -145,10 +173,11 @@ int main(int argc, char **argv) {
 			perror("accept");
 			continue;
 		}
-
+		struct acceptConnectionData acceptData;
 		inet_ntop(their_addr.ss_family, get_in_addr((struct sockaddr*)&their_addr),s,sizeof(s));
-		cout<<"got connection from" << s << endl;
-		pthread_create(&accept_thread, NULL, accept_connection, (void *)new_fd);
+		acceptData.sender = s;
+		acceptData.new_fd = new_fd;
+		pthread_create(&accept_thread, NULL, accept_connection, (void *)&acceptData);
 
 	}
 	return 0;
@@ -157,33 +186,43 @@ int main(int argc, char **argv) {
 
 void* accept_connection(void *threadarg) {
 	//close(sockfd);
-	int new_fd = (intptr_t) threadarg;
+	struct acceptConnectionData *acceptData = (struct acceptConnectionData *)threadarg;
 	char buf[50];
 	int numbytes;
-	if((numbytes = recv(new_fd,&buf,50,0)) == -1) {
+	if((numbytes = recv(acceptData->new_fd,&buf,50,0)) == -1) {
 		perror("receive");
-		close(new_fd);
+		close(acceptData->new_fd);
 		exit(0);
 	}
 	buf[numbytes] = '\0';
 	//cout<<"server received " << buf <<endl; // value of clock at senders side
-	pthread_mutex_lock(&clock_mutex);
-	lclock.tick(atoi(buf));
-	cout << lclock.getClockValue() << "RECV"  <<endl;
+	vector<string> msgPayloadList;
+
+	split(buf,' ',msgPayloadList);
+
+	if(msgPayloadList.size() == 1) {
+	lclock.tick(atoi(msgPayloadList[0].c_str()));
+	cout << lclock.getClockValue() << "RECV"  << acceptData->sender <<endl;
 	lclock.tick();
 	pthread_mutex_unlock(&clock_mutex);
-	close(new_fd);
+	pthread_mutex_lock(&cornet_mutex);
+	cornet.addElement(acceptData->sender);
+	pthread_mutex_unlock(&cornet_mutex);
+	}
+	else {
+		lclock.tick(atoi(msgPayloadList[0].c_str()));
+		cout << lclock.getClockValue() << "SIGNAL"  << acceptData->sender <<endl;
+		lclock.tick();
+		pthread_mutex_unlock(&clock_mutex);
+		pthread_mutex_lock(&D_mutex);
+		D--;
+		pthread_mutex_unlock(&D_mutex);
+	}
+	close(acceptData->new_fd);
 	pthread_exit(NULL);
 }
 
-std::vector<std::string> &split(const std::string &s, char delim, std::vector<std::string> &elems) {
-    std::stringstream ss(s);
-    std::string item;
-    while(std::getline(ss, item, delim)) {
-        elems.push_back(item);
-    }
-    return elems;
-}
+
 
 void* send_master(void *threadarg) {
 	ifstream iFile;
@@ -191,7 +230,7 @@ void* send_master(void *threadarg) {
 	vector<string> paramData;
 	list<fileInput>fileInputList;
 	fileInput temp;
-	struct messagePayload *msg = new struct messagePayload;
+	struct messagePayload *msg;
 	pthread_t send_thread;
 
 	iFile.open("data");
@@ -220,12 +259,14 @@ void* send_master(void *threadarg) {
 					usleep(currentAction.param * 1000);
 				}
 				else if(currentAction.type == "IDLE") {
+					receivedIDLE = true;
 					// do some idle action
 				}
 				else if(currentAction.type == "INIT") {
 					// do nothing
 				}
 				else if(currentAction.type == "SEND") {
+					msg = new struct messagePayload;
 					msg->nodeid = nodes[currentAction.param].c_str(); // check if this works without c_str
 	//				msg->nodeid = "192.168.1.15";
 					sprintf(msg->payLoad, "%d",lclock.getClockValue());
@@ -235,7 +276,23 @@ void* send_master(void *threadarg) {
 				fileInputList.pop_front();
 			}
 
-		pthread_mutex_unlock(&clock_mutex);
+			pthread_mutex_unlock(&clock_mutex);
+			pthread_mutex_lock(&cornet_mutex);
+			if(!cornet.isEmpty()) {
+				pthread_mutex_lock(&D_mutex);
+				if( (D == 0 && cornet.size() == 1) || cornet.size() > 1) {
+					//send signal
+					msg = new struct messagePayload;
+					msg->nodeid = cornet.getElement().c_str();
+					pthread_mutex_lock(&clock_mutex);
+					sprintf(msg->payLoad, "%d SIGNAL",lclock.getClockValue());
+					pthread_create(&send_thread,NULL,send_message,(void *)msg);
+					lclock.tick();
+					pthread_mutex_unlock(&clock_mutex);
+				}
+				pthread_mutex_unlock(&D_mutex);
+			}
+			pthread_mutex_unlock(&cornet_mutex);
 	}
 
 	pthread_exit(NULL);
@@ -243,8 +300,7 @@ void* send_master(void *threadarg) {
 }
 
 void* send_message(void *threadarg) {
-		int sockfd, numbytes;
-		char buf[MAXDATASIZE];
+		int sockfd;
 		struct addrinfo hints, *servinfo, *p;
 		struct messagePayload *msg;
 		int rv;
@@ -282,6 +338,9 @@ void* send_message(void *threadarg) {
 			perror("send failed");
 			exit(1);
 		}
+		pthread_mutex_lock(&D_mutex);
+		D++;
+		pthread_mutex_unlock(&D_mutex);
 		close(sockfd);
 		pthread_exit(NULL);
 }

@@ -19,6 +19,7 @@ public:
 	void addElement(std::string);
 	std::string getElement();
 	bool isEmpty();
+	size_t size();
 	virtual ~Cornet();
 };
 

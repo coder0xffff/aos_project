@@ -46,3 +46,10 @@ bool Cornet::isEmpty() {
 	else
 		return false;
 }
+
+size_t Cornet::size() {
+	if(parent.empty())
+		return 0;
+	else
+		return requestList.size() + 1;
+}
