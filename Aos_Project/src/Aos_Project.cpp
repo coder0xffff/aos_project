@@ -281,7 +281,7 @@ void* send_master(void *threadarg) {
 			pthread_mutex_lock(&cornet_mutex);
 			if(!cornet.isEmpty()) {
 				pthread_mutex_lock(&D_mutex);
-				if( (D == 0 && cornet.size() == 1) || cornet.size() > 1) {
+				if((receivedIDLE &&  D == 0 && cornet.size() == 1) || cornet.size() > 1) {
 					//send signal
 					msg = new struct messagePayload;
 					msg->nodeid = cornet.getElement().c_str();
