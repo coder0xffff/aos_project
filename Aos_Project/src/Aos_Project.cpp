@@ -207,9 +207,9 @@ void* accept_connection(void *threadarg) {
 		lclock.tick();
 		pthread_mutex_unlock(&clock_mutex);
 		pthread_mutex_lock(&cornet_mutex);
-		cout<<"add cornet: " << acceptData->sender << endl;
+		//cout<<"add cornet: " << acceptData->sender << endl;
 		cornet.addElement(acceptData->sender);
-		cout<< "After add cornet: "<< "D: " << D << " " << "C: " << cornet.size() <<endl;
+		//cout<< "After add cornet: "<< "D: " << D << " " << "C: " << cornet.size() <<endl;
 		pthread_mutex_unlock(&cornet_mutex);
 	}
 	else {
@@ -221,7 +221,7 @@ void* accept_connection(void *threadarg) {
 		pthread_mutex_lock(&D_mutex);
 		D--;
 		pthread_mutex_unlock(&D_mutex);
-		cout<< "After recv signal: "<< "D: " << D << " " << "C: " << cornet.size() <<endl;
+		//cout<< "After recv signal: "<< "D: " << D << " " << "C: " << cornet.size() <<endl;
 	}
 	close(acceptData->new_fd);
 	pthread_exit(NULL);
@@ -282,7 +282,7 @@ void* send_master(void *threadarg) {
 					pthread_mutex_lock(&D_mutex);
 						D++;
 					pthread_mutex_unlock(&D_mutex);
-					cout<<"after sending message << " "D: " << D << " " << "C: " << cornet.size() <<endl;
+					//cout<<"after sending message << " "D: " << D << " " << "C: " << cornet.size() <<endl;
 					pthread_create(&send_thread,NULL,send_message,(void *)msg); // async thread call for sending message
 				}
 				lclock.tick();
@@ -301,7 +301,7 @@ void* send_master(void *threadarg) {
 				pthread_mutex_lock(&clock_mutex);
 				sprintf(msg->payLoad, "%d SIGNAL",lclock.getClockValue());
 				cout<< lclock.getClockValue() <<"SIGNAL SEND: " << ip2node[msg->nodeid] <<endl;
-				cout<<"at removing node "<< "D: " << D << " " << "C: " << cornet.size() <<endl;
+				//cout<<"at removing node "<< "D: " << D << " " << "C: " << cornet.size() <<endl;
 				pthread_create(&send_thread,NULL,send_message,(void *)msg);
 				lclock.tick();
 				pthread_mutex_unlock(&clock_mutex);
