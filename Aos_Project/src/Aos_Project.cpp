@@ -173,11 +173,11 @@ int main(int argc, char **argv) {
 			perror("accept");
 			continue;
 		}
-		struct acceptConnectionData acceptData;
+		struct acceptConnectionData *acceptData = new struct acceptConnectionData;
 		inet_ntop(their_addr.ss_family, get_in_addr((struct sockaddr*)&their_addr),s,sizeof(s));
-		acceptData.sender = s;
-		acceptData.new_fd = new_fd;
-		pthread_create(&accept_thread, NULL, accept_connection, (void *)&acceptData);
+		acceptData->sender = s;
+		acceptData->new_fd = new_fd;
+		pthread_create(&accept_thread, NULL, accept_connection, (void *)acceptData);
 
 	}
 	return 0;
@@ -202,7 +202,7 @@ void* accept_connection(void *threadarg) {
 
 	if(msgPayloadList.size() == 1) {
 	lclock.tick(atoi(msgPayloadList[0].c_str()));
-	cout << lclock.getClockValue() << "RECV"  << acceptData->sender <<endl;
+	cout << lclock.getClockValue() << "RECV "  << ip2node[acceptData->sender] <<endl;
 	lclock.tick();
 	pthread_mutex_unlock(&clock_mutex);
 	pthread_mutex_lock(&cornet_mutex);
@@ -212,7 +212,7 @@ void* accept_connection(void *threadarg) {
 	}
 	else {
 		lclock.tick(atoi(msgPayloadList[0].c_str()));
-		cout << lclock.getClockValue() << "SIGNAL"  << acceptData->sender <<endl;
+		cout << lclock.getClockValue() << " SIGNAL RECV: "  << ip2node[acceptData->sender] <<endl;
 		lclock.tick();
 		pthread_mutex_unlock(&clock_mutex);
 		pthread_mutex_lock(&D_mutex);
@@ -287,7 +287,7 @@ void* send_master(void *threadarg) {
 					msg->nodeid = cornet.getElement().c_str();
 					pthread_mutex_lock(&clock_mutex);
 					sprintf(msg->payLoad, "%d SIGNAL",lclock.getClockValue());
-					cout<<"sending signal:" << msg->nodeid <<endl;
+					cout<< lclock.getClockValue() <<"SIGNAL SEND: " << ip2node[msg->nodeid] <<endl;
 					pthread_create(&send_thread,NULL,send_message,(void *)msg);
 					lclock.tick();
 					pthread_mutex_unlock(&clock_mutex);
