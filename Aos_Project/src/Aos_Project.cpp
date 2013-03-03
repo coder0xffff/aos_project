@@ -84,7 +84,7 @@ T* end (T(&arr)[N]) {
 	return &arr[N];
 }
 //string nodes[] = {"192.168.1.8","192.168.1.9","192.168.1.10","192.168.1.12","192.168.1.13"};
-string nodes[] = {"10.176.67.66", "10.176.67.67", "10.176.67.68", "10.176.67.69", "10.176.67.70"};
+vector<string> nodes;
 //vector<string> nodeList(begin(nodes),end(nodes));
 map<string,int> ip2node;
 bool receivedIDLE = false;
@@ -120,11 +120,17 @@ int main(int argc, char **argv) {
 	ip2node["192.168.1.12"] = 3;
 	ip2node["192.168.1.13"] = 4;
 	*/
-	ip2node["10.176.67.66"] = 0;
-	ip2node["10.176.67.67"] = 1;
-	ip2node["10.176.67.68"] = 2;
-	ip2node["10.176.67.69"] = 3;
-	ip2node["10.176.67.70"] = 4;
+
+	ifstream nodeFile;
+	nodeFile.open("nodeList");
+	string line;
+	while(!nodeFile.eof()) {
+		int i = 0;
+		getline(nodeFile,line);
+		nodes.push_back(line);
+		ip2node[line] = i++;
+	}
+
 	currentNode = argv[1];
 	pthread_mutex_init(&clock_mutex,NULL);
 	pthread_mutex_init(&D_mutex,NULL);
