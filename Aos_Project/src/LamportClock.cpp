@@ -19,7 +19,6 @@ void LamportClock::tick(){
 }
 
 void LamportClock::tick(int clockValue){
-	tick();
 	clockValue += this->clockRate;
 	if(this->clockValue < clockValue) {
 		this->clockValue = clockValue;
