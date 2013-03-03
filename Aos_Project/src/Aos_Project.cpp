@@ -207,6 +207,7 @@ void* accept_connection(void *threadarg) {
 	pthread_mutex_unlock(&clock_mutex);
 	pthread_mutex_lock(&cornet_mutex);
 	cornet.addElement(acceptData->sender);
+	cout<<"add cornet: " << acceptData->sender << endl;
 	pthread_mutex_unlock(&cornet_mutex);
 	}
 	else {
@@ -286,6 +287,7 @@ void* send_master(void *threadarg) {
 					msg->nodeid = cornet.getElement().c_str();
 					pthread_mutex_lock(&clock_mutex);
 					sprintf(msg->payLoad, "%d SIGNAL",lclock.getClockValue());
+					cout<<"sending signal:" << msg->nodeid <<endl;
 					pthread_create(&send_thread,NULL,send_message,(void *)msg);
 					lclock.tick();
 					pthread_mutex_unlock(&clock_mutex);
