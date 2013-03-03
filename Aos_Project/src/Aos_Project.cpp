@@ -343,9 +343,13 @@ void* send_message(void *threadarg) {
 			perror("send failed");
 			exit(1);
 		}
-		pthread_mutex_lock(&D_mutex);
-		D++;
-		pthread_mutex_unlock(&D_mutex);
+		vector<string> splitPayload;
+		split(msg->payLoad,' ',splitPayload);
+		if(splitPayload.size() == 1) {
+			pthread_mutex_lock(&D_mutex);
+			D++;
+			pthread_mutex_unlock(&D_mutex);
+		}
 		close(sockfd);
 		pthread_exit(NULL);
 }
