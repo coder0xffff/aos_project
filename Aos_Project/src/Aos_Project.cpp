@@ -210,7 +210,7 @@ void* accept_connection(void *threadarg) {
 		pthread_mutex_unlock(&clock_mutex);
 		pthread_mutex_lock(&cornet_mutex);
 		cornet.addElement(acceptData->sender);
-		cout << "C: before: " << cornet.size() -1 << " now: " << cornet.size();
+		cout << "C: before: " << cornet.size() -1 << " now: " << cornet.size() << endl;
 		pthread_mutex_unlock(&cornet_mutex);
 	}
 	else {
