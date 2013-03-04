@@ -201,7 +201,8 @@ void* accept_connection(void *threadarg) {
 	if(msgPayloadList.size() == 1) {
 		// incoming is a message
 		pthread_mutex_lock(&clock_mutex);
-		cout<< "internal time: " << lclock.getClockValue() << "external time: " << msgPayloadList[0] << endl;
+		int externTime = atoi(msgPayloadList[0].c_str()) + lclock.getClockRate();
+		cout<< "internal time: " << lclock.getClockValue() << "external time: " << externTime << endl;
 		lclock.tick(atoi(msgPayloadList[0].c_str()));
 
 		cout << lclock.getClockValue() << "RECV "  << ip2node[acceptData->sender] <<endl;
@@ -209,18 +210,21 @@ void* accept_connection(void *threadarg) {
 		pthread_mutex_unlock(&clock_mutex);
 		pthread_mutex_lock(&cornet_mutex);
 		cornet.addElement(acceptData->sender);
+		cout << "C: before: " << cornet.size() -1 << " now: " << cornet.size();
 		pthread_mutex_unlock(&cornet_mutex);
 	}
 	else {
 		// incoming is a signal
 		pthread_mutex_lock(&clock_mutex);
-		cout<< "internal time: " << lclock.getClockValue() << "external time: " << msgPayloadList[0] << endl;
+		int externTime = atoi(msgPayloadList[0].c_str()) + lclock.getClockRate();
+		cout<< "internal time: " << lclock.getClockValue() << "external time: " << externTime << endl;
 		lclock.tick(atoi(msgPayloadList[0].c_str()));
 		cout << lclock.getClockValue() << " SIGNAL RECV: "  << ip2node[acceptData->sender] <<endl;
 		lclock.tick();
 		pthread_mutex_unlock(&clock_mutex);
 		pthread_mutex_lock(&D_mutex);
 		D--;
+		cout<< "D: before: " << D+1 << " now: " << D << endl;
 		pthread_mutex_unlock(&D_mutex);
 	}
 	close(acceptData->new_fd);
@@ -277,6 +281,7 @@ void* send_master(void *threadarg) {
 					sprintf(msg->payLoad, "%d",lclock.getClockValue());
 					pthread_mutex_lock(&D_mutex);
 						D++;
+					cout << "D before: " << D-1 <<" now: " << D << endl;
 					pthread_mutex_unlock(&D_mutex);
 					pthread_create(&send_thread,NULL,send_message,(void *)msg); // async thread call for sending message
 				}
@@ -291,6 +296,7 @@ void* send_master(void *threadarg) {
 			pthread_mutex_lock(&D_mutex);
 			if( (receivedIDLE &&  D == 0 && cornet.size() == 1) || (cornet.size() > 1) ) {
 				//send signal
+				cout<<"C: " << cornet.size() << " D: " << D << endl;
 				msg = new struct messagePayload;
 				msg->nodeid = cornet.getElement().c_str();
 				pthread_mutex_lock(&clock_mutex);
