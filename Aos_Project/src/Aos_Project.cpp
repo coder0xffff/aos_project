@@ -321,6 +321,7 @@ void* send_master(void *threadarg) {
 
 			if(initNode && fileInputList.empty() && D == 0) {
 				cout << "terminated: " << lclock.getClockValue() << endl;
+				break;
 			}
 		}
 		pthread_mutex_unlock(&cornet_mutex);
