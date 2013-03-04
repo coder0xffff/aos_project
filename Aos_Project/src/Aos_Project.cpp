@@ -74,18 +74,8 @@ struct acceptConnectionData {
 	string sender;
 	intptr_t new_fd;
 };
-template <typename T, size_t N>
-T* begin(T(&arr)[N]) {
-	return &arr[0];
-}
 
-template <typename T, size_t N>
-T* end (T(&arr)[N]) {
-	return &arr[N];
-}
-//string nodes[] = {"192.168.1.8","192.168.1.9","192.168.1.10","192.168.1.12","192.168.1.13"};
 vector<string> nodes;
-//vector<string> nodeList(begin(nodes),end(nodes));
 map<string,int> ip2node;
 bool receivedIDLE = false;
 bool initNode = false;
@@ -192,7 +182,6 @@ int main(int argc, char **argv) {
 
 
 void* accept_connection(void *threadarg) {
-	//close(sockfd);
 	struct acceptConnectionData *acceptData = (struct acceptConnectionData *)threadarg;
 	char buf[50];
 	int numbytes;
@@ -202,7 +191,6 @@ void* accept_connection(void *threadarg) {
 		exit(0);
 	}
 	buf[numbytes] = '\0';
-	//cout<<"server received " << buf <<endl; // value of clock at senders side
 	vector<string> msgPayloadList;
 
 	split(buf,' ',msgPayloadList);
@@ -214,9 +202,7 @@ void* accept_connection(void *threadarg) {
 		lclock.tick();
 		pthread_mutex_unlock(&clock_mutex);
 		pthread_mutex_lock(&cornet_mutex);
-		//cout<<"add cornet: " << acceptData->sender << endl;
 		cornet.addElement(acceptData->sender);
-		//cout<< "After add cornet: "<< "D: " << D << " " << "C: " << cornet.size() <<endl;
 		pthread_mutex_unlock(&cornet_mutex);
 	}
 	else {
@@ -228,7 +214,6 @@ void* accept_connection(void *threadarg) {
 		pthread_mutex_lock(&D_mutex);
 		D--;
 		pthread_mutex_unlock(&D_mutex);
-		//cout<< "After recv signal: "<< "D: " << D << " " << "C: " << cornet.size() <<endl;
 	}
 	close(acceptData->new_fd);
 	pthread_exit(NULL);
@@ -249,7 +234,6 @@ void* send_master(void *threadarg) {
 	while(!iFile.eof()) {
 		getline(iFile,line);
 		split(line,' ',paramData);
-		//cout<<" line no " << ++lineNo <<endl;
 		if(paramData[0] == currentNode) {
 			temp.nodeid = atoi(paramData[0].c_str());
 			temp.clockVal = atoi(paramData[1].c_str());
@@ -264,7 +248,6 @@ void* send_master(void *threadarg) {
 		if(!fileInputList.empty()) {
 			struct fileInput currentAction;
 			currentAction = fileInputList.front();
-			// check later and see if we can read value without doing a mutex check
 			pthread_mutex_lock(&clock_mutex);
 			while(lclock.getClockValue() == currentAction.clockVal) {
 				if(currentAction.type == "TICK") {
@@ -274,23 +257,19 @@ void* send_master(void *threadarg) {
 				else if(currentAction.type == "IDLE") {
 					cout<< lclock.getClockValue() << " " << currentAction.type <<endl;
 					receivedIDLE = true;
-					// do some idle action
 				}
 				else if(currentAction.type == "INIT") {
 					cout<< lclock.getClockValue() << " "<< currentAction.type <<endl;
 					initNode = true;
-					// do nothing
 				}
 				else if(currentAction.type == "SEND") {
 					cout<< lclock.getClockValue() << " " << currentAction.type <<" "<< currentAction.param <<endl;
 					msg = new struct messagePayload;
-					msg->nodeid = nodes[currentAction.param].c_str(); // check if this works without c_str
-					//				msg->nodeid = "192.168.1.15";
+					msg->nodeid = nodes[currentAction.param].c_str();
 					sprintf(msg->payLoad, "%d",lclock.getClockValue());
 					pthread_mutex_lock(&D_mutex);
 						D++;
 					pthread_mutex_unlock(&D_mutex);
-					//cout<<"after sending message << " "D: " << D << " " << "C: " << cornet.size() <<endl;
 					pthread_create(&send_thread,NULL,send_message,(void *)msg); // async thread call for sending message
 				}
 				lclock.tick();
@@ -309,7 +288,6 @@ void* send_master(void *threadarg) {
 				pthread_mutex_lock(&clock_mutex);
 				sprintf(msg->payLoad, "%d SIGNAL",lclock.getClockValue());
 				cout<< lclock.getClockValue() <<"SIGNAL SEND: " << ip2node[msg->nodeid] <<endl;
-				//cout<<"at removing node "<< "D: " << D << " " << "C: " << cornet.size() <<endl;
 				pthread_create(&send_thread,NULL,send_message,(void *)msg);
 				lclock.tick();
 				pthread_mutex_unlock(&clock_mutex);
@@ -317,7 +295,7 @@ void* send_master(void *threadarg) {
 			pthread_mutex_unlock(&D_mutex);
 		}
 		else {
-			//cornet is empty
+			//cornet is empty so we can try to check for termination
 
 			if(initNode && fileInputList.empty() && D == 0) {
 				cout << "terminated: " << lclock.getClockValue() << endl;
@@ -343,9 +321,8 @@ void* send_message(void *threadarg) {
 	msg = ( struct messagePayload*) threadarg;
 	if ((rv = getaddrinfo(msg->nodeid, PORT, &hints, &servinfo)) != 0) {
 		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
-		//	return 1;
 	}
-	// loop through all the results and connect to the first we can
+	// loop through all the results and connect to the first socketfd we can
 	for(p = servinfo; p != NULL; p = p->ai_next) {
 		if ((sockfd = socket(p->ai_family, p->ai_socktype,
 				p->ai_protocol)) == -1) {
