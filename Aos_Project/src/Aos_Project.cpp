@@ -114,13 +114,6 @@ int main(int argc, char **argv) {
 	hints.ai_family = AF_UNSPEC;
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_flags = AI_PASSIVE;
-/*
-	ip2node["192.168.1.8"] = 0;
-	ip2node["192.168.1.9"] = 1;
-	ip2node["192.168.1.10"] = 2;
-	ip2node["192.168.1.12"] = 3;
-	ip2node["192.168.1.13"] = 4;
-	*/
 
 	ifstream nodeFile;
 	nodeFile.open("nodeList");
@@ -326,7 +319,7 @@ void* send_master(void *threadarg) {
 		else {
 			//cornet is empty
 
-			if(initNode) {
+			if(initNode && fileInputList.empty() && D == 0) {
 				cout << "terminated: " << lclock.getClockValue() << endl;
 			}
 		}
@@ -376,17 +369,6 @@ void* send_message(void *threadarg) {
 		perror("send failed");
 		exit(1);
 	}
-	/*
-	vector<string> splitPayload;
-		split(msg->payLoad,' ',splitPayload);
-		if(splitPayload.size() == 1) {
-			// sent a message
-			pthread_mutex_lock(&D_mutex);
-			D++;
-			pthread_mutex_unlock(&D_mutex);
-
-		}
-		*/
 
 	close(sockfd);
 	pthread_exit(NULL);
