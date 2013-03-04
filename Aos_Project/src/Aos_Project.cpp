@@ -232,7 +232,9 @@ void* accept_connection(void *threadarg) {
 }
 
 
-
+/* decides to send or execute events from input file, along with deciding when to send signals to
+ * processes in cornet
+ */
 void* send_master(void *threadarg) {
 	ifstream iFile;
 	string line;
@@ -302,6 +304,7 @@ void* send_master(void *threadarg) {
 				pthread_mutex_lock(&clock_mutex);
 				sprintf(msg->payLoad, "%d SIGNAL",lclock.getClockValue());
 				cout<< lclock.getClockValue() <<"SIGNAL SEND: " << ip2node[msg->nodeid] <<endl;
+				cout<<"C: after sending: " << cornet.size() << endl;
 				pthread_create(&send_thread,NULL,send_message,(void *)msg);
 				lclock.tick();
 				pthread_mutex_unlock(&clock_mutex);
