@@ -30,7 +30,6 @@
 #include <fstream>
 #include <sstream>
 #include <map>
-#include <fstream>
 using namespace std;
 
 #define MAXDATASIZE 100 // max number of bytes we can get at once
@@ -76,7 +75,6 @@ struct acceptConnectionData {
 	intptr_t new_fd;
 };
 
-ofstream logFile;
 vector<string> nodes;
 map<string,int> ip2node;
 bool receivedIDLE = false;
@@ -87,6 +85,7 @@ int D = 0;     // sum of deficits of outgoing edges
 pthread_mutex_t clock_mutex;
 pthread_mutex_t D_mutex;
 pthread_mutex_t cornet_mutex;
+
 
 void* send_message(void *threadarg);
 void* send_master(void *threadarg);
@@ -120,9 +119,6 @@ int main(int argc, char **argv) {
 
 	currentNode = argv[1];
 
-	string logFileName = currentNode;
-	logFileName = logFileName + ".log";
-	logFile.open(logFileName.c_str());
 	pthread_mutex_init(&clock_mutex,NULL);
 	pthread_mutex_init(&D_mutex,NULL);
 	pthread_mutex_init(&cornet_mutex,NULL);
@@ -204,11 +200,11 @@ void* accept_connection(void *threadarg) {
 
 	if(msgPayloadList.size() == 1) {
 		// incoming is a message
-
+		pthread_mutex_lock(&clock_mutex);
+		cout<< "internal time: " << lclock.getClockValue() << "external time: " << msgPayloadList[0] << endl;
 		lclock.tick(atoi(msgPayloadList[0].c_str()));
 
 		cout << lclock.getClockValue() << "RECV "  << ip2node[acceptData->sender] <<endl;
-		logFile << lclock.getClockValue() << "RECV "  << ip2node[acceptData->sender] <<endl;
 		lclock.tick();
 		pthread_mutex_unlock(&clock_mutex);
 		pthread_mutex_lock(&cornet_mutex);
@@ -217,9 +213,10 @@ void* accept_connection(void *threadarg) {
 	}
 	else {
 		// incoming is a signal
+		pthread_mutex_lock(&clock_mutex);
+		cout<< "internal time: " << lclock.getClockValue() << "external time: " << msgPayloadList[0] << endl;
 		lclock.tick(atoi(msgPayloadList[0].c_str()));
 		cout << lclock.getClockValue() << " SIGNAL RECV: "  << ip2node[acceptData->sender] <<endl;
-		logFile << lclock.getClockValue() << " SIGNAL RECV: "  << ip2node[acceptData->sender] <<endl;
 		lclock.tick();
 		pthread_mutex_unlock(&clock_mutex);
 		pthread_mutex_lock(&D_mutex);
@@ -263,22 +260,18 @@ void* send_master(void *threadarg) {
 			while(lclock.getClockValue() == currentAction.clockVal) {
 				if(currentAction.type == "TICK") {
 					cout<< lclock.getClockValue() << currentAction.type << currentAction.param <<endl;
-					logFile<< lclock.getClockValue() << currentAction.type << currentAction.param <<endl;
 					usleep(currentAction.param * 1000);
 				}
 				else if(currentAction.type == "IDLE") {
 					cout<< lclock.getClockValue() << " " << currentAction.type <<endl;
-					logFile<< lclock.getClockValue() << " " << currentAction.type <<endl;
 					receivedIDLE = true;
 				}
 				else if(currentAction.type == "INIT") {
 					cout<< lclock.getClockValue() << " "<< currentAction.type <<endl;
-					logFile<< lclock.getClockValue() << " "<< currentAction.type <<endl;
 					initNode = true;
 				}
 				else if(currentAction.type == "SEND") {
 					cout<< lclock.getClockValue() << " " << currentAction.type <<" "<< currentAction.param <<endl;
-					logFile<< lclock.getClockValue() << " " << currentAction.type <<" "<< currentAction.param <<endl;
 					msg = new struct messagePayload;
 					msg->nodeid = nodes[currentAction.param].c_str();
 					sprintf(msg->payLoad, "%d",lclock.getClockValue());
@@ -303,7 +296,6 @@ void* send_master(void *threadarg) {
 				pthread_mutex_lock(&clock_mutex);
 				sprintf(msg->payLoad, "%d SIGNAL",lclock.getClockValue());
 				cout<< lclock.getClockValue() <<"SIGNAL SEND: " << ip2node[msg->nodeid] <<endl;
-				logFile<< lclock.getClockValue() <<"SIGNAL SEND: " << ip2node[msg->nodeid] <<endl;
 				pthread_create(&send_thread,NULL,send_message,(void *)msg);
 				lclock.tick();
 				pthread_mutex_unlock(&clock_mutex);
@@ -315,7 +307,6 @@ void* send_master(void *threadarg) {
 
 			if(initNode && fileInputList.empty() && D == 0) {
 				cout << "terminated: " << lclock.getClockValue() << endl;
-				logFile << "terminated: " << lclock.getClockValue() << endl;
 				break;
 			}
 		}
