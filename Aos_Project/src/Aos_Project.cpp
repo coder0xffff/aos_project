@@ -118,8 +118,8 @@ int main(int argc, char **argv) {
 	ifstream nodeFile;
 	nodeFile.open("nodeList");
 	string line;
+	int i = 0;
 	while(!nodeFile.eof()) {
-		int i = 0;
 		getline(nodeFile,line);
 		nodes.push_back(line);
 		ip2node[line] = i++;
